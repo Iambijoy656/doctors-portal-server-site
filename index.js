@@ -2,9 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+
+const nodemailer = require("nodemailer");
+const mg = require('nodemailer-mailgun-transport');
+
+
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 const port = process.env.PORT || 5000;
+
 
 // payment stripe key
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
@@ -37,6 +43,69 @@ function verifyJWT(req, res, next) {
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.iyuahvh.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+
+
+
+function sendBookingEmail(booking) {
+    const { email, treatment, appointmentDate, slot } = booking;
+
+
+    // send grid transport
+    // let transporter = nodemailer.createTransport({
+    //     host: 'smtp.sendgrid.net',
+    //     port: 587,
+    //     auth: {
+    //         user: "apikey",
+    //         pass: process.env.SENDGRID_API_KEY
+    //     }
+    // })
+
+
+
+
+    const auth = {
+        auth: {
+            api_key: process.env.EMAIL_SEND_KEY,
+            domain: process.env.EMAIL_SEND_DOMAIN
+        }
+    }
+
+    const transporter = nodemailer.createTransport(mg(auth));
+
+
+
+
+
+    transporter.sendMail({
+        from: "bijoydas00656@gmail.com", // verified sender email
+        to: email || 'bijoydas00656@gmail.com', // recipient email
+        subject: `Your Appointment for ${treatment} is confirm`, // Subject line
+        text: "Hello world!", // plain text body
+        html: `
+        <h3>Your appointment is confirmed</h3>
+
+        <div>
+        <p> Your appointment for treatment: ${treatment}</p>
+        <p>Please Visit us On ${appointmentDate} at ${slot}</p>
+        <p>Thanks from Doctors Portal.</p>
+        
+        </div>
+        
+        `, // html body
+    }, function (error, info) {
+        if (error) {
+            console.log("error is:", error);
+        } else {
+            console.log('Email sent: ' + info.response);
+        }
+    });
+
+}
+
+
+
+
+
 
 async function run() {
 
@@ -204,6 +273,10 @@ async function run() {
 
 
             const result = await bookingsCollection.insertOne(booking)
+
+            // send email about appointment confirmation
+            sendBookingEmail(booking)
+
             res.send(result)
         })
 
